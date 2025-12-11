@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body style="padding-top:20px;">
+
+    <!-- Login -->
+    <div id="login-scr" style="position:fixed; inset:0; background:var(--bg-body); z-index:9000; display:flex; justify-content:center; align-items:center;">
+        <div class="panel" style="text-align:center; width:300px;">
+            <h2 style="color:var(--brand); margin-bottom:20px;">LOGIN</h2>
+            <input type="password" id="pass" class="inp" placeholder="Password">
+            <button onclick="login()" class="btn">ENTER</button>
+        </div>
+    </div>
+
+    <div class="container" style="display:flex; justify-content:space-between; align-items:center;">
+        <div class="logo">ADMIN<span>PANEL</span></div>
+        <a href="index.html" target="_blank" class="tab active" style="text-decoration:none;">View App</a>
+    </div>
+
+    <div class="adm-wrap">
+        
+        <!-- 1. CATEGORIES -->
+        <div class="panel">
+            <h3 style="color:white; margin-bottom:10px;">Categories</h3>
+            <div style="display:flex; gap:10px;">
+                <input type="text" id="c-name" class="inp" placeholder="Name">
+                <button onclick="addCat()" class="btn" style="width:auto;">ADD</button>
+            </div>
+            <div id="cat-list" style="margin-top:10px; display:flex; gap:5px; flex-wrap:wrap;"></div>
+        </div>
+
+        <!-- 2. ADD MATCH -->
+        <div class="panel">
+            <h3 style="color:var(--brand); margin-bottom:10px;" id="form-head">Create Stream</h3>
+            <input type="hidden" id="edit-id">
+            
+            <select id="m-cat" class="inp"><option value="All">Select Category</option></select>
+            <input type="text" id="m-title" class="inp" placeholder="Match Title">
+            <input type="text" id="m-poster" class="inp" placeholder="Poster Image URL">
+            
+            <div style="display:flex; gap:10px;">
+                <input type="number" id="v-min" class="inp" placeholder="Min Views">
+                <input type="number" id="v-max" class="inp" placeholder="Max Views">
+            </div>
+
+            <div id="links-wrap" style="background:rgba(0,0,0,0.3); padding:10px; border-radius:8px; margin-bottom:10px;">
+                <div style="font-size:11px; color:gray; margin-bottom:5px;">SOURCES</div>
+                <div class="l-row" style="display:flex; gap:10px; margin-bottom:10px;">
+                    <input type="text" class="inp q-lbl" placeholder="Label" style="width:30%; margin:0;">
+                    <input type="text" class="inp q-url" placeholder="m3u8 Link" style="flex:1; margin:0;">
+                </div>
+            </div>
+            <button onclick="addLinkField()" class="btn" style="background:#222; color:white; width:100%; margin-bottom:10px;">+ Add Quality</button>
+            
+            <div style="display:flex; gap:10px;">
+                <button onclick="pubMatch()" id="pub-btn" class="btn">GO LIVE</button>
+                <button onclick="resetForm()" class="btn" style="background:#333;">RESET</button>
+            </div>
+        </div>
+
+        <!-- 3. SLIDER -->
+        <div class="panel">
+            <h3 style="color:var(--accent); margin-bottom:10px;">Hero Slider</h3>
+            <input type="text" id="sl-title" class="inp" placeholder="Title">
+            <input type="text" id="sl-img" class="inp" placeholder="Image URL">
+            <input type="text" id="sl-link" class="inp" placeholder="Stream Link (Optional)">
+            <button onclick="addSlide()" class="btn" style="background:var(--accent);">ADD SLIDE</button>
+            <div id="slide-list" style="margin-top:10px;"></div>
+        </div>
+
+        <!-- 4. DYNAMIC NOTIFICATION -->
+        <div class="panel">
+            <h3 style="color:var(--success); margin-bottom:10px;">Island Notification</h3>
+            <input type="text" id="n-title" class="inp" placeholder="Title">
+            <input type="text" id="n-msg" class="inp" placeholder="Message">
+            <input type="text" id="n-img" class="inp" placeholder="Image URL">
+            <input type="text" id="n-link" class="inp" placeholder="Link URL">
+            <button onclick="sendIsland()" class="btn" style="background:#fff; color:black;">BROADCAST</button>
+        </div>
+
+        <!-- LIST -->
+        <div class="panel">
+            <h3>Active Streams</h3>
+            <div id="stream-list"></div>
+        </div>
+
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    <script src="admin.js"></script>
+</body>
+</html>
