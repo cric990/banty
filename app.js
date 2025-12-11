@@ -1,4 +1,4 @@
-// CONFIG
+// --- CONFIG (PASTE YOUR FIREBASE CONFIG) ---
 const firebaseConfig = {
   apiKey: "AIzaSyA2iHrUt8_xxvB2m8-LftaE9sg_5JaiFk8",
   authDomain: "banty-live.firebaseapp.com",
@@ -11,21 +11,24 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-// --- 1. SEARCH FIX ---
+// --- 1. SEARCH LOGIC ---
 function toggleSearch() {
-    document.getElementById('search-bar').classList.toggle('open');
-    if(document.getElementById('search-bar').classList.contains('open')) {
+    const s = document.getElementById('search-ui');
+    s.classList.toggle('active');
+    if(s.classList.contains('active')) {
+        document.getElementById('search-inp').value = "";
         document.getElementById('search-inp').focus();
+    } else {
+        renderGrid(allData);
     }
 }
 document.getElementById('search-inp').addEventListener('input', (e) => {
     const val = e.target.value.toLowerCase();
-    document.querySelectorAll('.card').forEach(c => {
-        c.style.display = c.innerText.toLowerCase().includes(val) ? 'block' : 'none';
-    });
+    const filtered = allData.filter(d => d.title.toLowerCase().includes(val));
+    renderGrid(filtered);
 });
 
-// --- 2. DYNAMIC ISLAND (BOUNCE IN/OUT) ---
+// --- 2. DYNAMIC ISLAND ---
 const notifSound = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3");
 let islandUrl = "";
 
@@ -43,31 +46,22 @@ function triggerIsland(d) {
     document.getElementById('di-msg').innerText = d.msg;
     document.getElementById('di-img').src = d.img || 'https://via.placeholder.com/50';
     islandUrl = d.link;
-
-    // BOUNCE IN
     el.classList.add('active');
     notifSound.play().catch(()=>{});
-
-    // BOUNCE OUT AFTER 6s
-    setTimeout(() => {
-        el.classList.remove('active');
-    }, 6000);
+    setTimeout(() => el.classList.remove('active'), 6000);
 }
+function expandIsland() { if(islandUrl) window.location.href = islandUrl; }
 
-function expandIsland() {
-    if(islandUrl) window.location.href = islandUrl;
-}
-
-// --- 3. WHATSAPP TOAST (25 Min) ---
+// --- 3. WHATSAPP TOAST ---
 function showWa() {
     const t = document.getElementById('wa-popup');
     t.classList.add('show');
     setTimeout(() => t.classList.remove('show'), 5000);
 }
-setInterval(showWa, 1500000); // 25 Min
-setTimeout(showWa, 15000);    // First run
+setInterval(showWa, 1500000);
+setTimeout(showWa, 15000);
 
-// --- 4. DATA RENDER ---
+// --- 4. DATA LOGIC ---
 let allData = [];
 let curCat = 'All';
 
@@ -86,24 +80,22 @@ function filter(c, btn) {
     document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('grid-head').innerText = c + " Matches";
-    render();
+    renderGrid(curCat === 'All' ? allData : allData.filter(d => d.category === c));
 }
 
 // Matches
 db.collection("matches").orderBy("time", "desc").onSnapshot(s => {
     allData = [];
     s.forEach(doc => allData.push(doc.data()));
-    render();
+    if(!document.getElementById('search-ui').classList.contains('active')) renderGrid(allData);
 });
 
-function render() {
+function renderGrid(data) {
     const g = document.getElementById('grid');
     g.innerHTML = "";
-    const filtered = curCat === 'All' ? allData : allData.filter(x => x.category === curCat);
-    
-    if(filtered.length === 0) { g.innerHTML = '<p style="padding:20px; color:gray;">No matches found.</p>'; return; }
+    if(data.length === 0) { g.innerHTML = '<p style="padding:20px; color:gray;">No matches found.</p>'; return; }
 
-    filtered.forEach(d => {
+    data.forEach(d => {
         const div = document.createElement('div');
         div.className = 'card';
         div.onclick = () => openPlayer(d);
@@ -124,29 +116,57 @@ function render() {
 const slider = document.getElementById('slider');
 db.collection("slider").orderBy("time", "desc").onSnapshot(s => {
     slider.innerHTML = "";
-    s.forEach(doc => {
-        const d = doc.data();
+    s.forEach(d => {
         const div = document.createElement('div');
         div.className = 'slide';
-        div.style.backgroundImage = `url('${d.img}')`;
-        if(d.link) div.onclick = () => openPlayer({title:d.title, streams:[{lbl:'HD', url:d.link}]});
-        div.innerHTML = `<div class="slide-overlay"><span class="slide-badge">HOT</span><div class="slide-title">${d.title}</div></div>`;
+        div.style.backgroundImage = `url('${d.data().img}')`;
+        if(d.data().link) div.onclick = () => openPlayer({title:d.data().title, streams:[{lbl:'HD', url:d.data().link, type:'m3u8'}]});
+        div.innerHTML = `<div class="slide-overlay"><span class="slide-badge">HOT</span><div class="slide-title">${d.data().title}</div></div>`;
         slider.appendChild(div);
     });
 });
 
-// --- 5. PLAYER ---
-var player = videojs('v-player', { fluid: true, html5: { hls: { overrideNative: true } } });
+// --- 5. PLAYER ENGINE (THE FIX) ---
+var player = videojs('v-player', {
+    fluid: true,
+    html5: {
+        vhs: { 
+            overrideNative: true,
+            withCredentials: false
+        },
+        nativeAudioTracks: false,
+        nativeVideoTracks: false
+    }
+});
+
 let viewInt;
+
+// Error Handling with Proxy Retry
+player.on('error', function() {
+    const error = player.error();
+    const currentSrc = player.src();
+    
+    // If error is network related and not already using proxy
+    if ((error.code === 2 || error.code === 4) && !currentSrc.includes('corsproxy.io')) {
+        console.log("Direct play failed. Attempting CORS Proxy...");
+        const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(currentSrc);
+        
+        player.error(null); // Clear error
+        player.src({ src: proxyUrl, type: 'application/x-mpegURL' });
+        player.play().catch(e => console.log("Proxy Autoplay blocked"));
+    }
+});
 
 function openPlayer(d) {
     document.getElementById('player-ui').classList.add('active');
     document.getElementById('p-title').innerText = d.title;
+    
     const qBox = document.getElementById('q-btns');
     qBox.innerHTML = "";
 
     if(d.streams && d.streams.length > 0) {
-        playLink(d.streams[0].url);
+        switchSource(d.streams[0]);
+
         d.streams.forEach((s, i) => {
             let b = document.createElement('div');
             b.className = i===0 ? 'btn-q active' : 'btn-q';
@@ -154,7 +174,7 @@ function openPlayer(d) {
             b.onclick = () => {
                 document.querySelectorAll('.btn-q').forEach(x=>x.classList.remove('active'));
                 b.classList.add('active');
-                playLink(s.url);
+                switchSource(s);
             }
             qBox.appendChild(b);
         });
@@ -167,18 +187,74 @@ function openPlayer(d) {
     viewInt = setInterval(() => updateView(min, max), 3000);
 }
 
+function switchSource(s) {
+    const v = document.getElementById('v-player');
+    const w = document.getElementById('web-player');
+    const vjs = document.querySelector('.video-js');
+
+    player.pause();
+    w.src = "";
+
+    if(s.type === 'embed') {
+        vjs.style.display = 'none';
+        w.style.display = 'block';
+        w.src = s.url;
+    } else {
+        w.style.display = 'none';
+        vjs.style.display = 'block';
+        
+        // Reset Error State
+        player.error(null);
+        
+        // Try Direct First
+        player.src({ src: s.url, type: 'application/x-mpegURL' });
+        player.play().catch(e => console.log("Auto-play prevented"));
+    }
+}
+
 function updateView(min, max) {
     const v = Math.floor(Math.random() * (max - min + 1) + min);
     document.getElementById('view-cnt').innerText = v.toLocaleString();
 }
 
-function playLink(url) {
-    player.src({ src: url, type: 'application/x-mpegURL' });
-    player.play().catch(()=>{});
-}
-
 function closePlayer() {
     player.pause();
+    document.getElementById('web-player').src = "";
     document.getElementById('player-ui').classList.remove('active');
     clearInterval(viewInt);
 }
+
+// --- 6. NOTIFICATIONS ---
+function toggleNotif() {
+    document.getElementById('n-menu').classList.toggle('active');
+    document.getElementById('n-badge').style.display = 'none';
+}
+
+db.collection("notifications").orderBy("time", "desc").onSnapshot(s => {
+    const list = document.getElementById('n-list');
+    list.innerHTML = "";
+    let count = 0;
+    const now = Date.now();
+    const limit = 3600000; // 1 Hour
+
+    s.forEach(d => {
+        const data = d.data();
+        if(now - data.time < limit) {
+            count++;
+            const min = Math.floor((now - data.time)/60000);
+            list.innerHTML += `
+                <div class="n-item">
+                    <h4>${data.title}</h4>
+                    <p>${data.msg}</p>
+                    <span>${min} mins ago</span>
+                </div>`;
+        }
+    });
+
+    if(count === 0) list.innerHTML = '<div style="padding:20px;text-align:center;color:gray;">No alerts</div>';
+    if(count > 0) {
+        const b = document.getElementById('n-badge');
+        b.style.display = 'flex';
+        b.innerText = count;
+    }
+});
