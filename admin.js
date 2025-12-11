@@ -1,4 +1,4 @@
-// CONFIG
+// CONFIG (Same)
 const firebaseConfig = {
   apiKey: "AIzaSyA2iHrUt8_xxvB2m8-LftaE9sg_5JaiFk8",
   authDomain: "banty-live.firebaseapp.com",
@@ -16,7 +16,7 @@ function login() {
     if(document.getElementById('pass').value === "gunnu") {
         document.getElementById('login-scr').style.display = 'none';
         loadAdmin();
-    } else alert("Wrong");
+    } else alert("Wrong Password");
 }
 
 // 1. CATEGORY
@@ -89,22 +89,18 @@ function addSlide() {
         img: document.getElementById('sl-img').value,
         link: document.getElementById('sl-link').value,
         time: Date.now()
-    }).then(()=>alert("Slide Added"));
+    }).then(()=>alert("Added"));
 }
-
 function sendIsland() {
     db.collection("island_alerts").add({
         title: document.getElementById('n-title').value,
         msg: document.getElementById('n-msg').value,
-        img: document.getElementById('n-img').value,
-        link: document.getElementById('n-link').value,
         time: Date.now()
     }).then(()=>alert("Sent"));
 }
 
-// LOAD
+// LOAD LISTS
 function loadAdmin() {
-    // Cats
     db.collection("categories").onSnapshot(s => {
         const sel = document.getElementById('m-cat');
         const lst = document.getElementById('cat-list');
@@ -116,19 +112,17 @@ function loadAdmin() {
             lst.innerHTML += `<button class="btn-del" onclick="db.collection('categories').doc('${d.id}').delete()">${n} ×</button>`;
         });
     });
-    // Slider
     db.collection("slider").onSnapshot(s => {
         const l = document.getElementById('slide-list'); l.innerHTML="";
         s.forEach(d => l.innerHTML += `<div style="color:white;margin-bottom:5px;border-bottom:1px solid #333;">${d.data().title} <button onclick="db.collection('slider').doc('${d.id}').delete()" style="color:red;background:none;border:none;">DEL</button></div>`);
     });
-    // Matches
     db.collection("matches").orderBy("time", "desc").onSnapshot(s => {
         const l = document.getElementById('stream-list'); l.innerHTML = "";
         s.forEach(d => {
             const data = d.data();
             const str = encodeURIComponent(JSON.stringify(data.streams));
             l.innerHTML += `
-                <div style="background:var(--bg-card); padding:10px; border:1px solid #333; margin-bottom:5px; display:flex; justify-content:space-between; align-items:center; color:white;">
+                <div style="background:#111; padding:10px; border:1px solid #333; margin-bottom:5px; display:flex; justify-content:space-between; align-items:center; color:white;">
                     <span>${data.title}</span>
                     <div>
                         <button class="btn" style="background:#ffaa00; width:auto; padding:5px 10px; font-size:10px;" onclick="editMatch('${d.id}', '${data.title}', '${data.poster}', '${data.minViews}', '${data.maxViews}', '${data.category}', '${str}')">EDIT</button>

@@ -3,81 +3,111 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BANTY-LIVE | Ultimate</title>
+    <title>BANTY-LIVE | Premium</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://vjs.zencdn.net/8.0.4/video-js.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
 
-    <!-- 1. DYNAMIC ISLAND (HIDDEN NOTCH, BOUNCES IN) -->
-    <div id="island-wrap" class="island-container">
-        <div id="island" class="dynamic-island" onclick="expandIsland()">
-            <img src="" id="di-img" class="di-img">
-            <div class="di-content">
-                <div class="di-title" id="di-title">Notification</div>
-                <div class="di-desc" id="di-msg">Tap to view</div>
-            </div>
-            <div class="di-anim">
-                <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+    <!-- DYNAMIC ISLAND ALERT -->
+    <div id="island-wrap" class="island-wrap">
+        <div class="island">
+            <i class="fas fa-bell di-icon"></i>
+            <div class="di-txt">
+                <h4 id="di-title">Alert</h4>
+                <p id="di-msg">Message</p>
             </div>
         </div>
     </div>
 
-    <!-- 2. WHATSAPP TOAST -->
+    <!-- WHATSAPP TOAST -->
     <div id="wa-popup" class="wa-toast">
-        <i class="fab fa-whatsapp" style="color:var(--success); font-size:24px;"></i>
-        <div style="flex:1; color:white;">
-            <div style="font-size:12px; font-weight:bold;">Join Channel</div>
-            <div style="font-size:10px; color:#aaa;">Get Links Instantly</div>
+        <i class="fab fa-whatsapp" style="color:var(--success); font-size:28px;"></i>
+        <div style="flex:1;">
+            <div style="color:white; font-size:13px; font-weight:700;">Join Channel</div>
+            <div style="color:#aaa; font-size:11px;">Get Instant Updates</div>
         </div>
         <a href="https://whatsapp.com/channel/0029VbAvIUo2ZjCu4eWjOw1T" target="_blank" class="wa-btn">JOIN</a>
     </div>
 
-    <!-- 3. HEADER -->
+    <!-- SEARCH OVERLAY -->
+    <div id="search-ui" class="search-overlay">
+        <div class="search-box">
+            <input type="text" id="search-inp" class="search-inp" placeholder="Search matches...">
+            <i class="fas fa-times search-close" onclick="toggleSearch()"></i>
+        </div>
+    </div>
+
+    <!-- HEADER -->
     <header>
         <div class="logo">BANTY<span>LIVE</span></div>
-        <i class="fas fa-search search-btn" onclick="toggleSearch()"></i>
+        <div class="nav-icons">
+            <i class="fas fa-search icon-btn" onclick="toggleSearch()"></i>
+            <div style="position:relative;" onclick="toggleNotif()">
+                <i class="fas fa-bell icon-btn"></i>
+                <div id="n-badge" class="badge"></div>
+                <div id="n-menu" class="notif-menu">
+                    <div class="n-head">NOTIFICATIONS (1 HR)</div>
+                    <div id="n-list" class="n-list">
+                        <div style="padding:20px; text-align:center; color:gray;">No alerts</div>
+                    </div>
+                </div>
+            </div>
+            <i class="fas fa-user-circle icon-btn"></i>
+        </div>
     </header>
 
-    <!-- SEARCH BAR -->
-    <div id="search-bar" class="search-wrapper">
-        <input type="text" id="search-inp" class="search-inp" placeholder="Search matches...">
+    <!-- CATEGORIES -->
+    <div class="tabs" id="cat-tabs">
+        <div class="tab active" onclick="filterData('All', this)">All Events</div>
     </div>
 
-    <!-- 4. CATEGORIES -->
-    <div class="tab-row" id="cat-tabs">
-        <div class="tab active" onclick="filterCat('All', this)">All Events</div>
-    </div>
-
-    <!-- 5. SLIDER -->
+    <!-- SLIDER -->
     <div class="slider" id="slider">
         <div class="slide" style="display:flex;justify-content:center;align-items:center;color:gray;">Loading...</div>
     </div>
 
-    <!-- 6. GRID -->
+    <!-- GRID -->
     <div class="container">
-        <div class="head" id="grid-head"><div class="live-dot"></div> Live Matches</div>
+        <div class="sec-head"><div class="live-dot"></div> Live Now</div>
         <div id="grid" class="grid">
-            <p style="color:gray; padding:20px; text-align:center; width:100%;">Loading Stream Data...</p>
+            <p style="text-align:center; width:100%; padding:30px; color:gray;">Fetching Streams...</p>
         </div>
     </div>
 
-    <!-- 7. PLAYER -->
+    <!-- SMART PLAYER MODAL -->
     <div id="player-ui" class="player-modal">
         <div class="p-head">
-            <i class="fas fa-arrow-left" style="font-size:20px; cursor:pointer;" onclick="closePlayer()"></i>
-            <span id="p-title" style="font-weight:600;">Match Title</span>
+            <i class="fas fa-arrow-left p-back" onclick="closePlayer()"></i>
+            <span id="p-title" class="p-title">Match Title</span>
         </div>
-        <div class="video-box">
+        
+        <div class="video-box" id="video-container">
+            <!-- 1. HLS Player -->
             <video id="v-player" class="video-js vjs-big-play-centered vjs-theme-city" controls playsinline>
                 <p class="vjs-no-js">Enable JS</p>
             </video>
+            
+            <!-- 2. Iframe Player (Auto Fallback) -->
+            <iframe id="web-player" class="iframe-box" src="" frameborder="0" allowfullscreen style="display:none;" sandbox="allow-scripts allow-same-origin allow-presentation"></iframe>
+
+            <!-- Error Message -->
+            <div id="vid-error" class="error-msg">
+                <i class="fas fa-exclamation-triangle" style="font-size:30px; color:var(--accent);"></i>
+                <p style="margin-top:10px; font-size:12px;">Connecting to backup source...</p>
+            </div>
         </div>
-        <div class="p-controls" id="q-btns"></div>
+
+        <div class="controls" id="q-btns"></div>
+
         <div class="p-info">
             <div class="p-views"><i class="fas fa-eye"></i> <span id="view-cnt">0</span> Watching</div>
-            <p style="color:#aaa; font-size:12px; margin-top:5px;">Secure Stream. Please wait while loading.</p>
+            <p style="color:#aaa; font-size:12px; margin-top:5px; line-height:1.5;">
+                <i class="fas fa-shield-alt" style="color:var(--success)"></i> Secure Connection. <br>
+                If stream fails, the player will automatically try alternative sources.
+            </p>
+            <button onclick="location.reload()" style="margin-top:15px; background:#111; color:#fff; border:1px solid #333; padding:10px 20px; border-radius:8px; cursor:pointer;">Refresh Page</button>
         </div>
     </div>
 
