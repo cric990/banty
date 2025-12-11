@@ -13,7 +13,7 @@ const db = firebase.firestore();
 
 // AUTH
 function login() {
-    if(document.getElementById('pass').value === "admin123") {
+    if(document.getElementById('pass').value === "gunnu") {
         document.getElementById('login-scr').style.display = 'none';
         loadAdmin();
     } else alert("Wrong Password");
