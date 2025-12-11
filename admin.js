@@ -1,4 +1,4 @@
-// CONFIG (Same)
+// CONFIG (Same as App)
 const firebaseConfig = {
   apiKey: "AIzaSyA2iHrUt8_xxvB2m8-LftaE9sg_5JaiFk8",
   authDomain: "banty-live.firebaseapp.com",
@@ -13,7 +13,7 @@ const db = firebase.firestore();
 
 // AUTH
 function login() {
-    if(document.getElementById('pass').value === "gunnu") {
+    if(document.getElementById('pass').value === "admin123") {
         document.getElementById('login-scr').style.display = 'none';
         loadAdmin();
     } else alert("Wrong Password");
@@ -26,11 +26,11 @@ function addCat() {
 }
 
 // 2. MATCH
-function addLinkField(lbl='', url='') {
+function addLinkField(type='m3u8', lbl='', url='') {
     const d = document.createElement('div');
     d.className = 'l-row';
     d.style = "display:flex; gap:10px; margin-bottom:10px;";
-    d.innerHTML = `<input type="text" class="inp q-lbl" value="${lbl}" placeholder="Label" style="width:30%; margin:0;"><input type="text" class="inp q-url" value="${url}" placeholder="Link" style="flex:1; margin:0;"><button onclick="this.parentElement.remove()" style="color:red; background:none; border:none;">X</button>`;
+    d.innerHTML = `<select class="inp q-type" style="width:25%;margin:0;padding:10px;"><option value="m3u8" ${type==='m3u8'?'selected':''}>M3U8</option><option value="embed" ${type==='embed'?'selected':''}>Embed</option></select><input type="text" class="inp q-lbl" value="${lbl}" placeholder="Label" style="width:20%;margin:0;"><input type="text" class="inp q-url" value="${url}" placeholder="Link" style="flex:1;margin:0;"><button onclick="this.parentElement.remove()" style="color:red;background:none;border:none;">X</button>`;
     document.getElementById('links-wrap').appendChild(d);
 }
 
@@ -41,15 +41,19 @@ function pubMatch() {
     const poster = document.getElementById('m-poster').value;
     const min = document.getElementById('v-min').value || 1000;
     const max = document.getElementById('v-max').value || 2000;
+    const proxy = document.getElementById('use-proxy').checked;
+
+    if(cat === 'All') return alert("Select Category");
 
     let streams = [];
     document.querySelectorAll('.l-row').forEach(r => {
+        const t = r.querySelector('.q-type').value;
         const l = r.querySelector('.q-lbl').value;
         const u = r.querySelector('.q-url').value;
-        if(u) streams.push({lbl: l, url: u});
+        if(u) streams.push({type: t, lbl: l, url: u});
     });
 
-    const data = { category: cat, title: title, poster: poster, minViews: min, maxViews: max, streams: streams, time: Date.now() };
+    const data = { category: cat, title: title, poster: poster, minViews: min, maxViews: max, streams: streams, useProxy: proxy, time: Date.now() };
 
     if(id) {
         db.collection("matches").doc(id).update(data).then(() => { alert("Updated"); resetForm(); });
@@ -58,7 +62,7 @@ function pubMatch() {
     }
 }
 
-window.editMatch = function(id, t, p, min, max, c, sStr) {
+window.editMatch = function(id, t, p, min, max, c, proxy, sStr) {
     window.scrollTo({top:0, behavior:'smooth'});
     document.getElementById('form-head').innerText = "Edit Stream";
     document.getElementById('pub-btn').innerText = "UPDATE";
@@ -68,8 +72,9 @@ window.editMatch = function(id, t, p, min, max, c, sStr) {
     document.getElementById('v-min').value = min;
     document.getElementById('v-max').value = max;
     document.getElementById('m-cat').value = c;
+    document.getElementById('use-proxy').checked = proxy;
     document.getElementById('links-wrap').innerHTML = '<div style="font-size:11px;color:gray;margin-bottom:5px;">SOURCES</div>';
-    JSON.parse(decodeURIComponent(sStr)).forEach(s => addLinkField(s.lbl, s.url));
+    JSON.parse(decodeURIComponent(sStr)).forEach(s => addLinkField(s.type, s.lbl, s.url));
 };
 
 function resetForm() {
@@ -78,28 +83,20 @@ function resetForm() {
     document.getElementById('pub-btn').innerText = "GO LIVE";
     document.getElementById('m-title').value = "";
     document.getElementById('m-poster').value = "";
+    document.getElementById('use-proxy').checked = false;
     document.getElementById('links-wrap').innerHTML = '<div style="font-size:11px;color:gray;margin-bottom:5px;">SOURCES</div>';
     addLinkField();
 }
 
 // 3. SLIDER & NOTIF
 function addSlide() {
-    db.collection("slider").add({
-        title: document.getElementById('sl-title').value,
-        img: document.getElementById('sl-img').value,
-        link: document.getElementById('sl-link').value,
-        time: Date.now()
-    }).then(()=>alert("Added"));
+    db.collection("slider").add({ title: document.getElementById('sl-title').value, img: document.getElementById('sl-img').value, link: document.getElementById('sl-link').value, time: Date.now() }).then(()=>alert("Added"));
 }
 function sendIsland() {
-    db.collection("island_alerts").add({
-        title: document.getElementById('n-title').value,
-        msg: document.getElementById('n-msg').value,
-        time: Date.now()
-    }).then(()=>alert("Sent"));
+    db.collection("island_alerts").add({ title: document.getElementById('n-title').value, msg: document.getElementById('n-msg').value, img: document.getElementById('n-img').value, link: document.getElementById('n-link').value, time: Date.now() }).then(()=>alert("Sent"));
 }
 
-// LOAD LISTS
+// LOAD
 function loadAdmin() {
     db.collection("categories").onSnapshot(s => {
         const sel = document.getElementById('m-cat');
@@ -122,10 +119,10 @@ function loadAdmin() {
             const data = d.data();
             const str = encodeURIComponent(JSON.stringify(data.streams));
             l.innerHTML += `
-                <div style="background:#111; padding:10px; border:1px solid #333; margin-bottom:5px; display:flex; justify-content:space-between; align-items:center; color:white;">
+                <div style="background:var(--bg-card); padding:10px; border:1px solid #333; margin-bottom:5px; display:flex; justify-content:space-between; align-items:center; color:white;">
                     <span>${data.title}</span>
                     <div>
-                        <button class="btn" style="background:#ffaa00; width:auto; padding:5px 10px; font-size:10px;" onclick="editMatch('${d.id}', '${data.title}', '${data.poster}', '${data.minViews}', '${data.maxViews}', '${data.category}', '${str}')">EDIT</button>
+                        <button class="btn" style="background:#ffaa00; width:auto; padding:5px 10px; font-size:10px;" onclick="editMatch('${d.id}', '${data.title}', '${data.poster}', '${data.minViews}', '${data.maxViews}', '${data.category}', ${data.useProxy}, '${str}')">EDIT</button>
                         <button class="btn" style="background:var(--accent); width:auto; padding:5px 10px; font-size:10px;" onclick="db.collection('matches').doc('${d.id}').delete()">DEL</button>
                     </div>
                 </div>`;

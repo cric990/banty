@@ -15,10 +15,8 @@ const db = firebase.firestore();
 function toggleSearch() {
     const s = document.getElementById('search-ui');
     s.classList.toggle('active');
-    if(s.classList.contains('active')) {
-        document.getElementById('search-inp').value = "";
-        document.getElementById('search-inp').focus();
-    } else renderGrid(allData);
+    if(s.classList.contains('active')) document.getElementById('search-inp').focus();
+    else renderGrid(allData);
 }
 document.getElementById('search-inp').addEventListener('input', (e) => {
     const val = e.target.value.toLowerCase();
@@ -28,6 +26,8 @@ document.getElementById('search-inp').addEventListener('input', (e) => {
 
 // --- 2. DYNAMIC ISLAND ---
 const notifSound = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3");
+let islandUrl = "";
+
 db.collection("island_alerts").orderBy("time", "desc").limit(1).onSnapshot(snap => {
     snap.docChanges().forEach(c => {
         if(c.type === 'added' && Date.now() - c.doc.data().time < 10000) {
@@ -35,16 +35,20 @@ db.collection("island_alerts").orderBy("time", "desc").limit(1).onSnapshot(snap 
         }
     });
 });
+
 function triggerIsland(d) {
     const el = document.getElementById('island-wrap');
     document.getElementById('di-title').innerText = d.title;
     document.getElementById('di-msg').innerText = d.msg;
+    document.getElementById('di-img').src = d.img || 'https://via.placeholder.com/50';
+    islandUrl = d.link;
     el.classList.add('active');
     notifSound.play().catch(()=>{});
     setTimeout(() => el.classList.remove('active'), 6000);
 }
+function expandIsland() { if(islandUrl) window.location.href = islandUrl; }
 
-// --- 3. WHATSAPP TOAST ---
+// --- 3. WHATSAPP ---
 function showWa() {
     const t = document.getElementById('wa-popup');
     t.classList.add('show');
@@ -60,16 +64,16 @@ let curCat = 'All';
 // Cats
 db.collection("categories").onSnapshot(s => {
     const t = document.getElementById('cat-tabs');
-    t.innerHTML = `<div class="tab active" onclick="filter('All', this)">All Events</div>`;
+    t.innerHTML = `<div class="tab-pill active" onclick="filterCat('All', this)">All Events</div>`;
     s.forEach(d => {
         const n = d.data().name;
-        t.innerHTML += `<div class="tab" onclick="filter('${n}', this)">${n}</div>`;
+        t.innerHTML += `<div class="tab-pill" onclick="filterCat('${n}', this)">${n}</div>`;
     });
 });
 
-function filter(c, btn) {
+function filterCat(c, btn) {
     curCat = c;
-    document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-pill').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     renderGrid(c === 'All' ? allData : allData.filter(d => d.category === c));
 }
@@ -88,15 +92,18 @@ function renderGrid(data) {
 
     data.forEach(d => {
         const div = document.createElement('div');
-        div.className = 'card';
+        div.className = 'match-card';
         div.onclick = () => openPlayer(d);
         div.innerHTML = `
-            <img src="${d.poster}" class="poster" onerror="this.src='https://via.placeholder.com/300x160'">
-            <div class="c-body">
-                <div class="c-title">${d.title}</div>
-                <div class="c-meta">
-                    <span class="live-txt">● LIVE</span>
-                    <span>${d.streams ? d.streams.length : 1} Source</span>
+            <div class="poster-wrap">
+                <img src="${d.poster}" class="poster-img" onerror="this.src='https://via.placeholder.com/300x160'">
+                <div class="card-overlay-badge">HD</div>
+            </div>
+            <div class="card-content">
+                <div class="card-title">${d.title}</div>
+                <div class="card-meta">
+                    <div class="live-status"><div class="live-beacon"></div> LIVE</div>
+                    <div>${d.streams ? d.streams.length : 1} Src</div>
                 </div>
             </div>`;
         g.appendChild(div);
@@ -109,31 +116,17 @@ db.collection("slider").orderBy("time", "desc").onSnapshot(s => {
     slider.innerHTML = "";
     s.forEach(d => {
         const div = document.createElement('div');
-        div.className = 'slide';
+        div.className = 'hero-card';
         div.style.backgroundImage = `url('${d.data().img}')`;
         if(d.data().link) div.onclick = () => openPlayer({title:d.data().title, streams:[{lbl:'HD', url:d.data().link}]});
-        div.innerHTML = `<div class="slide-overlay"><span class="slide-tag">HOT</span><div class="slide-title">${d.data().title}</div></div>`;
+        div.innerHTML = `<div class="hero-overlay"><span class="hero-badge">HOT</span><div class="hero-title">${d.data().title}</div></div>`;
         slider.appendChild(div);
     });
 });
 
-// --- 5. SMART PLAYER ENGINE (THE FIX) ---
-var player = videojs('v-player', { fluid: true, html5: { hls: { overrideNative: true } } });
+// --- 5. CLAPPR PLAYER ENGINE ---
+let playerInstance = null;
 let viewInt;
-let currentUrl = "";
-
-// Auto-switch to Iframe if VideoJS fails
-player.on('error', function() {
-    console.log("VideoJS Error. Switching to Iframe mode...");
-    // Hide VideoJS, Show Iframe with same URL
-    document.querySelector('.video-js').style.display = 'none';
-    const iframe = document.getElementById('web-player');
-    iframe.style.display = 'block';
-    iframe.src = currentUrl;
-    
-    // Hide Error Message if it was shown
-    document.getElementById('vid-error').style.display = 'none';
-});
 
 function openPlayer(d) {
     document.getElementById('player-ui').classList.add('active');
@@ -143,16 +136,16 @@ function openPlayer(d) {
     qBox.innerHTML = "";
 
     if(d.streams && d.streams.length > 0) {
-        tryPlay(d.streams[0].url);
+        playStream(d.streams[0], d.useProxy);
 
         d.streams.forEach((s, i) => {
             let b = document.createElement('div');
-            b.className = i===0 ? 'btn-q active' : 'btn-q';
+            b.className = i===0 ? 'pm-btn active' : 'pm-btn';
             b.innerText = s.lbl;
             b.onclick = () => {
-                document.querySelectorAll('.btn-q').forEach(x=>x.classList.remove('active'));
+                document.querySelectorAll('.pm-btn').forEach(x=>x.classList.remove('active'));
                 b.classList.add('active');
-                tryPlay(s.url);
+                playStream(s, d.useProxy);
             }
             qBox.appendChild(b);
         });
@@ -165,29 +158,43 @@ function openPlayer(d) {
     viewInt = setInterval(() => updateView(min, max), 3000);
 }
 
-function tryPlay(url) {
-    currentUrl = url;
-    const vjsTech = document.querySelector('.video-js');
+function playStream(s, useProxy) {
+    // DESTROY OLD
+    if(playerInstance) { playerInstance.destroy(); playerInstance = null; }
+    document.getElementById('player-container').innerHTML = "";
+    
     const iframe = document.getElementById('web-player');
-    
-    // Reset
-    player.error(null);
-    document.getElementById('vid-error').style.display = 'none';
+    const playerBox = document.getElementById('player-container');
 
-    // 1. Detect if URL is definitely NOT a video file (e.g. .html, .php, or just domain)
-    const isVideoFile = url.includes('.m3u8') || url.includes('.mp4') || url.includes('.mkv');
-    
-    if(!isVideoFile) {
-        // Direct Iframe Mode
-        vjsTech.style.display = 'none';
+    iframe.src = "";
+    iframe.style.display = 'none';
+    playerBox.style.display = 'none';
+
+    let finalUrl = s.url;
+    if(useProxy) {
+        // Use a CORS proxy if selected in admin
+        finalUrl = 'https://corsproxy.io/?' + encodeURIComponent(s.url);
+    }
+
+    if(s.type === 'embed') {
         iframe.style.display = 'block';
-        iframe.src = url;
+        iframe.src = s.url;
     } else {
-        // Try VideoJS Mode
-        iframe.style.display = 'none';
-        vjsTech.style.display = 'block';
-        player.src({ src: url, type: 'application/x-mpegURL' });
-        player.play().catch(e => console.log("Autoplay blocked"));
+        playerBox.style.display = 'block';
+        playerInstance = new Clappr.Player({
+            source: finalUrl,
+            parentId: "#player-container",
+            width: '100%',
+            height: '100%',
+            autoPlay: true,
+            playback: {
+                hlsjsConfig: {
+                    xhrSetup: function(xhr, url) {
+                        xhr.withCredentials = false; // Important
+                    }
+                }
+            }
+        });
     }
 }
 
@@ -197,13 +204,13 @@ function updateView(min, max) {
 }
 
 function closePlayer() {
-    player.pause();
+    if(playerInstance) { playerInstance.destroy(); playerInstance = null; }
     document.getElementById('web-player').src = "";
     document.getElementById('player-ui').classList.remove('active');
     clearInterval(viewInt);
 }
 
-// --- 6. NOTIFICATIONS (1 Hour) ---
+// --- 6. NOTIFICATIONS ---
 function toggleNotif() {
     document.getElementById('n-menu').classList.toggle('active');
     document.getElementById('n-badge').style.display = 'none';
@@ -214,7 +221,7 @@ db.collection("notifications").orderBy("time", "desc").onSnapshot(s => {
     list.innerHTML = "";
     let count = 0;
     const now = Date.now();
-    const limit = 3600000; 
+    const limit = 3600000;
 
     s.forEach(d => {
         const data = d.data();
@@ -222,18 +229,28 @@ db.collection("notifications").orderBy("time", "desc").onSnapshot(s => {
             count++;
             const min = Math.floor((now - data.time)/60000);
             list.innerHTML += `
-                <div class="n-item">
-                    <h4>${data.title}</h4>
-                    <p>${data.msg}</p>
-                    <span>${min} mins ago</span>
+                <div class="np-item">
+                    <div class="np-title">${data.title}</div>
+                    <div class="np-msg">${data.msg}</div>
+                    <span class="np-time">${min}m ago</span>
                 </div>`;
         }
     });
 
     if(count === 0) list.innerHTML = '<div style="padding:20px;text-align:center;color:gray;">No alerts</div>';
     if(count > 0) {
-        const b = document.getElementById('n-badge');
-        b.style.display = 'block';
-        b.innerText = count;
+        document.getElementById('n-badge').style.display = 'block';
     }
 });
+
+// THEME
+function toggleTheme() {
+    const b = document.body;
+    const i = document.getElementById('theme-icon');
+    if(b.getAttribute('data-theme')==='light') {
+        b.removeAttribute('data-theme'); localStorage.setItem('theme','dark'); i.classList.remove('fa-moon'); i.classList.add('fa-sun');
+    } else {
+        b.setAttribute('data-theme','light'); localStorage.setItem('theme','light'); i.classList.remove('fa-sun'); i.classList.add('fa-moon');
+    }
+}
+if(localStorage.getItem('theme')==='light') toggleTheme();
